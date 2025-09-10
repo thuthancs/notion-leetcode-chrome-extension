@@ -3,41 +3,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="popup.css"/>
     <title>LeetCode Notion Chrome Extension</title>
 </head>
+
 <body>
     <!--These fields will be populated when the user first clicks the Chrome Extension-->
-    <h1>Problem Name</h1>
-    <input id="problem-name" placeholder="Two Sum"/>
-    <h1>Difficulty</h1>
-    <input id="difficulty" placeholder="Easy"/>
-    <h1>Topic</h1>
-    <input id="topic" placeholder="Array"/>
+    <div class="container">
+        <h1>Problem Name</h1>
+        <input id="problem-name" placeholder="Two Sum"/>
+        <h1>Difficulty</h1>
+        <input id="difficulty" placeholder="Easy"/>
+        <h1>Topic</h1>
+        <label for="topic">Choose a topic:</label>
+        <select name="topic" id="topic">
+            <option>Array</option>
+            <option>Two Pointers</option>
+            <option>Sliding Window</option>
+            <option>Dynamic Programming</option>
+            <option>Backtracking</option>
+            <option>Tree</option>
+            <option>Graph</option>
+            <option>Heap/Queue</option>
+            <option>Stack</option>
+        </select>
 
-    <!--Timer field is automatically set based on the difficulty level-->
-    <h1>Timer</h1>
-    <input id="timer" placeholder="00:00"/>
-    <button id="start-btn">Start Timer</button>
-
-    <!--After the start timer button is clicked, all above fields will be hidden -->
-    <div id="timer-circle">
-        <!--The circle with the timer running and the button solved that the user might click if they solve it early -->
-        <button id="done-early-btn">Done Early</button>
+        <!--Timer field is automatically set based on the difficulty level-->
+        <h1>Timer</h1>
+        <input id="timer" placeholder="00:00"/>
+        <button id="start-btn">Start Timer</button>
     </div>
 
-    <!--When the time is up, the below fields are displayed-->
-    <button id="solved-btn">Solved</button>
-    <button id="extend-btn">Extend</button>
+    <!--After the start timer button is clicked, all above fields will be hidden -->
+    <div class="timer-container">
+        <h1 id="countdown-display">00:00</h1>
+        <div id="timer-circle">
+            <button id="done-early-btn">Done Early</button>
+        </div>
 
-    <!--When the Solved button is clicked, user will input these fields-->
-    <label for="solve-status">Choose an option:</label>
-    <select name="solve-status" id="solve-status">
-        <option>Solved with hints</option>
-        <option>Solved without hints</option>
-        <option>Read solutions</option>
-    </select>
+        <!--When the time is up, the below fields are displayed-->
+        <button id="solved-btn">Solved</button>
+        <button id="extend-btn">Extend</button>
 
-    <!--When the Extend button is clicked-->
+        <!--When the Solved button is clicked, user will input this field-->
+        <select name="solve-status" id="solve-status">
+            <option>Solved with hints</option>
+            <option>Solved without hints</option>
+            <option>Read solutions</option>
+        </select>
+    </div>
+
     <script type="module" src="popup.js"></script>
 </body>
 </html>

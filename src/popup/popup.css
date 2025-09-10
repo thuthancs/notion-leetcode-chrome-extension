@@ -1,0 +1,22 @@
+body {
+  width: 400px;
+  min-height: 200px;
+}
+
+input {
+    width: 400px;
+}
+
+.container {
+    margin-right: 10px;
+}
+
+.timer-container {
+    display: none;
+}
+
+#solved-btn, 
+#extend-btn, 
+#solve-status {
+    display: none;
+}
