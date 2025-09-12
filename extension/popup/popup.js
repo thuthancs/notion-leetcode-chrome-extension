@@ -93,8 +93,8 @@ doneEarlyBtn.addEventListener("click", () => {
     countdownDisplay.textContent = formatTime(timeRemaining)
 
     // Show solved/extend options
+    doneEarlyBtn.style.display = "none";
     solvedBtn.style.display = "inline-block";
-    extendBtn.style.display = "inline-block";
     solveStatus.style.display = "inline-block";
 
     // Store timeSpent in chrome.storage so we can later send to Notion
@@ -103,6 +103,7 @@ doneEarlyBtn.addEventListener("click", () => {
 // Solved button logic
 solvedBtn.addEventListener("click", () => {
     solveStatus.style.display = "inline-block";
+
 })
 
 // Extend button logic
