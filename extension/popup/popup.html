@@ -8,14 +8,15 @@
 </head>
 
 <body>
-    <!--These fields will be populated when the user first clicks the Chrome Extension-->
+    <!-- Initial setup view -->
     <div class="container">
         <h1>Problem Name</h1>
         <input id="problem-name" placeholder="Two Sum"/>
+        
         <h1>Difficulty</h1>
-        <input id="difficulty" placeholder="Easy"/>
+        <input id="difficulty" placeholder="Easy" readonly/>
+        
         <h1>Topic</h1>
-        <label for="topic">Choose a topic:</label>
         <select name="topic" id="topic">
             <option>Array</option>
             <option>String</option>
@@ -29,24 +30,24 @@
             <option>Stack</option>
         </select>
 
-        <!--Timer field is automatically set based on the difficulty level-->
-        <h1>Timer</h1>
-        <input id="timer" placeholder="00:00"/>
+        <h1>Timer Duration</h1>
+        <input id="timer" placeholder="00:00" readonly/>
+        
         <button id="start-btn">Start Timer</button>
     </div>
 
-    <!--After the start timer button is clicked, all above fields will be hidden -->
+    <!-- Timer active view -->
     <div class="timer-container">
         <h1 id="countdown-display">00:00</h1>
+        
         <div id="timer-circle">
             <button id="done-early-btn">Done Early</button>
         </div>
 
-        <!--When the time is up, the below fields are displayed-->
+        <!-- Shown when time is up or done early -->
         <button id="solved-btn">Solved</button>
-        <button id="extend-btn">Extend</button>
+        <button id="extend-btn">Extend Time</button>
 
-        <!--When the Solved button is clicked, user will input this field-->
         <select name="solve-status" id="solve-status">
             <option>Solved with hints</option>
             <option>Solved without hints</option>
@@ -54,8 +55,9 @@
         </select>
     </div>
 
-    <div id="congrats-message" style="display:none; text-align:center; margin-top:40px;">
-        <h2>🎉 Congratulations on solving the problem! 🎉</h2>
+    <!-- Success message -->
+    <div id="congrats-message">
+        <h2>🎉 Congratulations!<br>Problem logged successfully! 🎉</h2>
     </div>
 
     <script src="popup.js"></script>

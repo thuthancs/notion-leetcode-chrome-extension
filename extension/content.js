@@ -62,13 +62,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
 
     if (msg.type === "SCRAPE_CODE") {
-        // Scrape code from Monaco editor
-        const codeDiv = document.querySelector('.view-lines.monaco-mouse-cursor-text');
+        // Scrape code from Monaco editor, prefer textarea for accuracy
         let code = '';
-        if (codeDiv) {
-            code = Array.from(codeDiv.querySelectorAll('.view-line'))
-                .map(line => line.innerText)
-                .join('\n');
+        const textarea = document.querySelector('textarea.inputarea');
+        if (textarea && textarea.value) {
+            code = textarea.value;
+        } else {
+            // Fallback: scrape visible lines (may be incomplete/out of order)
+            const codeDiv = document.querySelector('.view-lines.monaco-mouse-cursor-text');
+            if (codeDiv) {
+                code = Array.from(codeDiv.querySelectorAll('.view-line'))
+                    .map(line => line.innerText)
+                    .join('\n');
+            }
         }
         sendResponse({ code });
     }
