@@ -12,11 +12,11 @@ const notion = new Client({ auth: process.env.NOTION_KEY });
 // Start timer endpoint (when the Start Timer button is clicked)
 app.post('/pages/start-timer', async function(request, response) {
     const { problemName, difficulty, topic } = request.body;
-    const dbID = process.env.NOTION_DATABASE_ID; // Get from environment variable
-    
+    const dbID = process.env.NOTION_DATASOURCE_ID; // This is now your data source ID
+
     console.log('Received start-timer request:', { problemName, difficulty, topic });
-    console.log('Using database ID:', dbID);
-    
+    console.log('Using data source ID:', dbID);
+
     // Validate required fields
     if (!problemName || !difficulty || !topic) {
         return response.status(400).json({
@@ -24,68 +24,58 @@ app.post('/pages/start-timer', async function(request, response) {
             error: 'Missing required fields: problemName, difficulty, or topic'
         });
     }
-    
-    if (!dbID) {
-        return response.status(500).json({
-            success: false,
-            error: 'Database ID not configured in environment variables'
-        });
-    }
-    
+
     try {
-        const newPage = await notion.pages.create({
-            parent: {
-                type: "database_id",
-                database_id: dbID,
-            },
-            properties: {
-                "Problem Name": {
-                    type: "title",
-                    title: [
-                        {
-                            type: "text",
-                            text: {
-                                content: problemName
-                            }
-                        }
-                    ]
-                },
-                "Topic": {
-                    type: "multi_select",
-                    multi_select: [
-                        {
-                            name: topic
-                        }
-                    ]
-                },
-                "Difficulty": {
-                    type: "select",
-                    select: {
-                        name: difficulty
-                    }
-                },
-                "Source": {
-                    type: "select",
-                    select: {
-                        name: "LeetCode"
-                    }
+        // 1. Query for pages that contain the problem name (broader match)
+        const search = await notion.dataSources.query({
+            data_source_id: dbID,
+            filter: {
+                property: "Problem Name",
+                title: {
+                    contains: problemName.trim()
                 }
             }
         });
-        
-        console.log('Page created successfully:', newPage.id);
-        
-        response.status(200).json({ 
-            success: true, 
-            pageId: newPage.id,
-            message: "Timer started successfully" 
+
+        // 2. Manually check for exact match (case-insensitive, trimmed)
+        const normalizedInput = problemName.trim().toLowerCase();
+        const existingPage = search.results.find(page => {
+            const titleArr = page.properties["Problem Name"].title;
+            const pageTitle = titleArr.map(t => t.plain_text).join("").trim().toLowerCase();
+            return pageTitle === normalizedInput;
         });
-        
+
+        if (existingPage) {
+            // Page exists, return its ID
+            return response.status(200).json({
+                success: true,
+                pageId: existingPage.id,
+                message: "Existing page found"
+            });
+        }
+
+        // 3. If not found, create a new page (update parent type for data source)
+        const newPage = await notion.pages.create({
+            parent: { type: "data_source_id", data_source_id: dbID },
+            properties: {
+                "Problem Name": { title: [{ type: "text", text: { content: problemName } }] },
+                "Topic": { multi_select: [{ name: topic }] },
+                "Difficulty": { select: { name: difficulty } },
+                "Source": { select: { name: "LeetCode" } }
+            }
+        });
+
+        response.status(200).json({
+            success: true,
+            pageId: newPage.id,
+            message: "Timer started successfully"
+        });
+
     } catch (error) {
-        console.error("Error creating page:", error);
-        response.status(500).json({ 
-            success: false, 
-            error: error.message 
+        console.error("Error in /pages/start-timer:", error);
+        response.status(500).json({
+            success: false,
+            error: error.message
         });
     }
 });
