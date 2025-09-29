@@ -32,6 +32,9 @@ const setTimer = (difficulty) => {
 let countdownInterval = null;
 let totalTime = 0;
 let timeRemaining = 0;
+let timeSpent = 0; // track total time spent solving a problem
+let wasExtended = false; // track if user extended
+let wasDoneEarly = false; // track if user finished early
 
 // Format time into 00:00 (minutes:seconds)
 function formatTime(totalSeconds) {
@@ -42,29 +45,45 @@ function formatTime(totalSeconds) {
 
 // Start countdown
 function startCountdown(durationMinutes) {
-    /* The total time is converted into seconds and initially, 
-    the remaining time is equal to the total time */
+    // Convert duration to seconds and initialize remaining time
     totalTime = durationMinutes * 60;
-    timeRemaining = totalTime
-
-    // If the countdownInterval is already set, we stop it from being executed repeatedly
+    timeRemaining = totalTime;
+    
+    // Only reset timeSpent if this is the very first countdown (not an extension)
+    if (timeSpent === 0) {
+        timeSpent = 0;
+    }
+    
+    // Clear any existing countdown to prevent multiple timers
     if (countdownInterval) clearInterval(countdownInterval);
-
-    // Update the countdownDisplay text content to be the newly formated 00:00 one
+    
+    // Display initial formatted time
     countdownDisplay.textContent = formatTime(timeRemaining);
-
-    // Now, set the countdown interval by keep decrementing the timeRemaining by 1 second
+    
+    // Start countdown timer that decrements every second
     countdownInterval = setInterval(() => {
         timeRemaining--;
+        timeSpent++;
         
-        // If the time remaining is less than or equal to 0, reset the interval to be 00:00
+        // Handle countdown completion
         if (timeRemaining <= 0) {
             clearInterval(countdownInterval);
-            countdownDisplay.textContent = "00:00";
+            countdownDisplay.textContent = formatTime(0);
 
-            // Show solved/extend buttons
-            document.getElementById("solved-btn").style.display = "inline-block";
-            document.getElementById("extend-btn").style.display = "inline-block";
+            // Send message to content script to show time up modal in main page
+            chrome.tabs && chrome.tabs.query && chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                if (tabs && tabs[0] && tabs[0].id) {
+                    chrome.tabs.sendMessage(tabs[0].id, { type: "SHOW_TIMEUP_MODAL" });
+                }
+            });
+
+            // Hide Done Early button
+            doneEarlyBtn.style.display = "none";
+
+            // Display solved and extend buttons, and show solve status when timer completes
+            solvedBtn.style.display = "block";
+            extendBtn.style.display = "block";
+            solveStatus.style.display = "block";
         } else {
             countdownDisplay.textContent = formatTime(timeRemaining);
         }
@@ -73,12 +92,29 @@ function startCountdown(durationMinutes) {
 
 // When the start button is clicked, the timer starts to count down
 startBtn.addEventListener("click", () => {
-    let minutes = setTimer(difficultyField.value)
-
+    let minutes = setTimer(difficultyField.value);
     startCountdown(minutes);
 
     document.querySelector(".container").style.display = "none";
     document.querySelector(".timer-container").style.display = "block";
+
+    // Tell server to create a new Notion page
+    fetch("http://localhost:3000/pages/start-timer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            problemName: problemNameField.value,
+            difficulty: difficultyField.value,
+            topic: topicField.value
+        })
+    }).then(res => res.json())
+      .then(data => {
+          console.log("Notion page created:", data);
+          if (data.pageId) {
+              chrome.storage.local.set({ notionPageId: data.pageId });
+          }
+      })
+      .catch(err => console.error("Error creating Notion page:", err));
 });
 
 // Done Early button logic
@@ -88,29 +124,149 @@ doneEarlyBtn.addEventListener("click", () => {
         countdownInterval = null;
     }
 
-    // Freeze the timer where it stopped
-    const timeSpent = totalTime - timeRemaining;
-    countdownDisplay.textContent = formatTime(timeRemaining)
+    // Calculate time spent
+    timeSpent = totalTime - timeRemaining;
+    countdownDisplay.textContent = formatTime(timeRemaining);
 
     // Show solved/extend options
     doneEarlyBtn.style.display = "none";
-    solvedBtn.style.display = "inline-block";
-    solveStatus.style.display = "inline-block";
+    solvedBtn.style.display = "block";
+    solveStatus.style.display = "block";
 
-    // Store timeSpent in chrome.storage so we can later send to Notion
+    // Set done early state
+    wasDoneEarly = true;
+
+    console.log("Timer stopped early. Time spent:", timeSpent);
 });
 
 // Solved button logic
-solvedBtn.addEventListener("click", () => {
-    solveStatus.style.display = "inline-block";
+solvedBtn.addEventListener('click', async () => {
+    clearInterval(countdownInterval); // Stop the timer
 
-})
+    // Get Notion page ID
+    const notionPageId = await new Promise((resolve) => {
+        chrome.storage.local.get("notionPageId", (result) => {
+            resolve(result.notionPageId);
+        });
+    });
+
+    const solveStatusValue = solveStatus.value;
+    const timeSpentMinutes = Math.ceil(timeSpent / 60);
+    const date = new Date().toISOString();
+
+    // Determine emoji
+    let emoji = "✅";
+    if (wasExtended) emoji = "🚨";
+    if (wasDoneEarly) emoji = "❇️";
+    if (solveStatusValue === "Read Solution") emoji = "⭕";
+
+    if (!notionPageId) {
+        console.error("No Notion page ID available. Cannot update.");
+        return;
+    }
+
+    // Scrape code from the active tab
+    let code = "";
+    try {
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        const activeTab = tabs[0];
+        code = await new Promise((resolve, reject) => {
+            chrome.tabs.sendMessage(activeTab.id, { type: "SCRAPE_CODE" }, (response) => {
+                if (chrome.runtime.lastError) {
+                    reject(chrome.runtime.lastError);
+                } else {
+                    resolve(response && response.code ? response.code : "");
+                }
+            });
+        });
+    } catch (err) {
+        console.error("Failed to scrape code:", err);
+    }
+
+    try {
+        const response = await fetch('http://127.0.0.1:3000/pages/solved', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                pageId: notionPageId,
+                solveStatus: solveStatusValue,
+                timeSpent: timeSpentMinutes,
+                date: date,
+                emoji: emoji,
+                code: code // <-- send code to server
+            }),
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            document.querySelector('.container').style.display = 'none';
+            document.querySelector('.timer-container').style.display = 'none';
+            const congratsDiv = document.getElementById('congrats-message');
+            if (congratsDiv) congratsDiv.style.display = 'block';
+            console.log("Notion page updated successfully!");
+        } else {
+            console.error("Error updating Notion page:", data.error);
+            alert(`Error updating Notion page: ${data.error}`);
+        }
+    } catch (error) {
+        console.error('Failed to communicate with the server:', error);
+        alert('Failed to communicate with the server.');
+    }
+});
 
 // Extend button logic
 extendBtn.addEventListener("click", () => {
-    // Reset the timer to be back to the original input
+    // Reset timer to the original difficulty-based duration
+    const minutes = setTimer(difficultyField.value);
 
-})
+    // Clear the current interval (if running)
+    if (countdownInterval) clearInterval(countdownInterval);
+
+    // Start countdown fresh
+    startCountdown(minutes);
+
+    // Set extended state
+    wasExtended = true;
+
+    console.log(`Timer reset to ${minutes} minutes for difficulty: ${difficultyField.value}`);
+});
+
+// Modal for time is up notification
+let timeupModal = document.getElementById("timeup-modal");
+if (!timeupModal) {
+    timeupModal = document.createElement("div");
+    timeupModal.id = "timeup-modal";
+    timeupModal.style.display = "none";
+    timeupModal.style.position = "fixed";
+    timeupModal.style.top = "0";
+    timeupModal.style.left = "0";
+    timeupModal.style.width = "100vw";
+    timeupModal.style.height = "100vh";
+    timeupModal.style.background = "rgba(0,0,0,0.5)";
+    timeupModal.style.zIndex = "9999";
+    timeupModal.style.justifyContent = "center";
+    timeupModal.style.alignItems = "center";
+    timeupModal.style.display = "flex";
+    timeupModal.innerHTML = `
+      <div style="background:white; padding:32px 24px; border-radius:8px; text-align:center; font-size:1.3em; min-width:200px;">
+        ⏰ Time is up!<br><br>
+        <button id="close-timeup-modal" style="margin-top:16px;">OK</button>
+      </div>
+    `;
+    timeupModal.style.display = "none";
+    document.body.appendChild(timeupModal);
+}
+function showTimeupModal() {
+    timeupModal.style.display = "flex";
+    const closeBtn = document.getElementById("close-timeup-modal");
+    if (closeBtn) {
+        closeBtn.onclick = () => {
+            timeupModal.style.display = "none";
+        };
+    }
+}
 
 // Check if we're on a LeetCode page and inject content script if needed
 async function ensureContentScript(tabId) {
@@ -123,7 +279,7 @@ async function ensureContentScript(tabId) {
         try {
             await chrome.scripting.executeScript({
                 target: { tabId: tabId },
-                files: ['src/content.js']
+                files: ['content.js']
             });
             return true;
         } catch (injectError) {

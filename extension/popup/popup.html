@@ -18,6 +18,7 @@
         <label for="topic">Choose a topic:</label>
         <select name="topic" id="topic">
             <option>Array</option>
+            <option>String</option>
             <option>Two Pointers</option>
             <option>Sliding Window</option>
             <option>Dynamic Programming</option>
@@ -49,10 +50,14 @@
         <select name="solve-status" id="solve-status">
             <option>Solved with hints</option>
             <option>Solved without hints</option>
-            <option>Read solutions</option>
+            <option>Read Solution</option>
         </select>
     </div>
 
-    <script type="module" src="popup.js"></script>
+    <div id="congrats-message" style="display:none; text-align:center; margin-top:40px;">
+        <h2>🎉 Congratulations on solving the problem! 🎉</h2>
+    </div>
+
+    <script src="popup.js"></script>
 </body>
 </html>
