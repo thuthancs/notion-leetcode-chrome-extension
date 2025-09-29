@@ -93,9 +93,9 @@ app.post('/pages/start-timer', async function(request, response) {
 // Update page endpoint (when the Solved button is clicked)
 app.post('/pages/solved', async function(request, response) {
     console.log("🚀 /pages/solved endpoint hit, body:", request.body);
-    const { pageId, solveStatus, timeSpent, date } = request.body;
+    const { pageId, solveStatus, timeSpent, date, emoji } = request.body;
     
-    console.log('Received solved request:', { pageId, solveStatus, timeSpent, date });
+    console.log('Received solved request:', { pageId, solveStatus, timeSpent, date, emoji });
     
     // Validate required fields
     if (!pageId || !solveStatus || timeSpent === undefined || !date) {
@@ -185,6 +185,24 @@ app.post('/pages/solved', async function(request, response) {
         const updatedPage = await notion.pages.update({
             page_id: pageId,
             properties: updateProperties
+        });
+        
+        // Determine emoji for icon
+        let iconEmoji = emoji || "✅";
+        // If all durations are filled after this update, set to ⭐
+        const allReviewed = (
+            (updateProperties["Duration 1"] || duration1) &&
+            (updateProperties["Duration 2"] || duration2) &&
+            (updateProperties["Duration 3"] || duration3)
+        );
+        if (allReviewed) iconEmoji = "⭐";
+        // Update the page icon
+        await notion.pages.update({
+            page_id: pageId,
+            icon: {
+                type: "emoji",
+                emoji: iconEmoji
+            }
         });
         
         console.log('Page updated successfully');
