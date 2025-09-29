@@ -93,7 +93,7 @@ app.post('/pages/start-timer', async function(request, response) {
 // Update page endpoint (when the Solved button is clicked)
 app.post('/pages/solved', async function(request, response) {
     console.log("🚀 /pages/solved endpoint hit, body:", request.body);
-    const { pageId, solveStatus, timeSpent, date, emoji } = request.body;
+    const { pageId, solveStatus, timeSpent, date, emoji, code } = request.body;
     
     console.log('Received solved request:', { pageId, solveStatus, timeSpent, date, emoji });
     
@@ -181,12 +181,12 @@ app.post('/pages/solved', async function(request, response) {
             });
         }
         
-        // Update the page
+        // Update the page properties
         const updatedPage = await notion.pages.update({
             page_id: pageId,
             properties: updateProperties
         });
-        
+
         // Determine emoji for icon
         let iconEmoji = emoji || "✅";
         // If all durations are filled after this update, set to ⭐
@@ -204,9 +204,38 @@ app.post('/pages/solved', async function(request, response) {
                 emoji: iconEmoji
             }
         });
-        
+
+        // If code is present, append it as a code block to the page
+        if (code && code.trim().length > 0) {
+            // Notion API limit: 2000 chars per code block, so split if needed
+            const codeBlocks = [];
+            for (let i = 0; i < code.length; i += 2000) {
+                codeBlocks.push(code.slice(i, i + 2000));
+            }
+            const children = codeBlocks.map(block => ({
+                object: "block",
+                type: "code",
+                code: {
+                    rich_text: [
+                        {
+                            type: "text",
+                            text: {
+                                content: block
+                            }
+                        }
+                    ],
+                    language: "python",
+                    caption: []
+                }
+            }));
+            await notion.blocks.children.append({
+                block_id: pageId,
+                children
+            });
+        }
+
         console.log('Page updated successfully');
-        
+
         response.status(200).json({
             success: true,
             message: "Problem marked as solved successfully",
