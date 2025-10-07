@@ -9,12 +9,255 @@ app.use(cors()); // Enable CORS for Chrome extension
 
 const notion = new Client({ auth: process.env.NOTION_KEY });
 
+// Function to parse formatted description into Notion blocks
+function parseDescriptionToNotionBlocks(description) {
+    const lines = description.split('\n');
+    const blocks = [];
+    let currentParagraph = '';
+    let inCodeBlock = false;
+    let codeBlockContent = '';
+    
+    console.log('Parsing description lines:', lines.length);
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        
+        // Handle code blocks (only if line is exactly ``` or has language specifier)
+        if (line === '```' || (line.startsWith('```') && line.length > 3)) {
+            if (inCodeBlock) {
+                // End of code block
+                if (codeBlockContent.trim()) {
+                    console.log('Creating code block with content:', codeBlockContent.trim());
+                    blocks.push({
+                        object: "block",
+                        type: "code",
+                        code: {
+                            rich_text: [
+                                {
+                                    type: "text",
+                                    text: {
+                                        content: codeBlockContent.trim()
+                                    }
+                                }
+                            ],
+                            language: "plain text"
+                        }
+                    });
+                } else {
+                    console.log('Skipping empty code block');
+                }
+                codeBlockContent = '';
+                inCodeBlock = false;
+            } else {
+                // Start of code block
+                if (currentParagraph) {
+                    blocks.push(createParagraphBlock(currentParagraph));
+                    currentParagraph = '';
+                }
+                inCodeBlock = true;
+            }
+            continue;
+        }
+
+        if (inCodeBlock) {
+            codeBlockContent += line + '\n';
+            continue;
+        }
+
+        // Handle headers (lines that are all bold)
+        if (line.startsWith('**') && line.endsWith('**') && line.length > 4) {
+            if (currentParagraph) {
+                blocks.push(createParagraphBlock(currentParagraph));
+                currentParagraph = '';
+            }
+            const headerText = line.slice(2, -2);
+            blocks.push({
+                object: "block",
+                type: "heading_3",
+                heading_3: {
+                    rich_text: [
+                        {
+                            type: "text",
+                            text: {
+                                content: headerText
+                            }
+                        }
+                    ]
+                }
+            });
+            continue;
+        }
+
+        // Handle list items
+        if (line.startsWith('• ') || line.match(/^\d+\. /)) {
+            if (currentParagraph) {
+                blocks.push(createParagraphBlock(currentParagraph));
+                currentParagraph = '';
+            }
+            const listText = line.replace(/^[•\d+\. ]/, '');
+            blocks.push({
+                object: "block",
+                type: "bulleted_list_item",
+                bulleted_list_item: {
+                    rich_text: [
+                        {
+                            type: "text",
+                            text: {
+                                content: listText
+                            }
+                        }
+                    ]
+                }
+            });
+            continue;
+        }
+
+        // Handle empty lines
+        if (line === '') {
+            if (currentParagraph) {
+                blocks.push(createParagraphBlock(currentParagraph));
+                currentParagraph = '';
+            }
+            continue;
+        }
+
+        // Regular text - add to current paragraph
+        if (currentParagraph) {
+            currentParagraph += ' ' + line;
+        } else {
+            currentParagraph = line;
+        }
+    }
+
+    // Add any remaining content
+    if (currentParagraph) {
+        blocks.push(createParagraphBlock(currentParagraph));
+    }
+
+    console.log('Created blocks:', blocks.length);
+    console.log('Block types:', blocks.map(b => b.type));
+    
+    return blocks;
+}
+
+// Helper function to create a paragraph block with rich text formatting
+function createParagraphBlock(text) {
+    const richText = parseRichText(text);
+    return {
+        object: "block",
+        type: "paragraph",
+        paragraph: {
+            rich_text: richText
+        }
+    };
+}
+
+// Helper function to parse markdown-like formatting into Notion rich text
+function parseRichText(text) {
+    const richText = [];
+    let currentText = text;
+    let position = 0;
+
+    while (position < currentText.length) {
+        // Look for bold text **text**
+        const boldMatch = currentText.slice(position).match(/\*\*(.*?)\*\*/);
+        if (boldMatch) {
+            // Add text before bold
+            if (boldMatch.index > 0) {
+                richText.push({
+                    type: "text",
+                    text: {
+                        content: currentText.slice(position, position + boldMatch.index)
+                    }
+                });
+            }
+            // Add bold text
+            richText.push({
+                type: "text",
+                text: {
+                    content: boldMatch[1]
+                },
+                annotations: {
+                    bold: true
+                }
+            });
+            position += boldMatch.index + boldMatch[0].length;
+            continue;
+        }
+
+        // Look for italic text *text*
+        const italicMatch = currentText.slice(position).match(/\*(.*?)\*/);
+        if (italicMatch) {
+            // Add text before italic
+            if (italicMatch.index > 0) {
+                richText.push({
+                    type: "text",
+                    text: {
+                        content: currentText.slice(position, position + italicMatch.index)
+                    }
+                });
+            }
+            // Add italic text
+            richText.push({
+                type: "text",
+                text: {
+                    content: italicMatch[1]
+                },
+                annotations: {
+                    italic: true
+                }
+            });
+            position += italicMatch.index + italicMatch[0].length;
+            continue;
+        }
+
+        // Look for inline code `text`
+        const codeMatch = currentText.slice(position).match(/`(.*?)`/);
+        if (codeMatch) {
+            // Add text before code
+            if (codeMatch.index > 0) {
+                richText.push({
+                    type: "text",
+                    text: {
+                        content: currentText.slice(position, position + codeMatch.index)
+                    }
+                });
+            }
+            // Add code text
+            richText.push({
+                type: "text",
+                text: {
+                    content: codeMatch[1]
+                },
+                annotations: {
+                    code: true
+                }
+            });
+            position += codeMatch.index + codeMatch[0].length;
+            continue;
+        }
+
+        // No more formatting found, add the rest as plain text
+        richText.push({
+            type: "text",
+            text: {
+                content: currentText.slice(position)
+            }
+        });
+        break;
+    }
+
+    return richText;
+}
+
 // Start timer endpoint (when the Start Timer button is clicked)
 app.post('/pages/start-timer', async function(request, response) {
-    const { problemName, difficulty, topic } = request.body;
+    const { problemName, difficulty, topic, description } = request.body;
     const dbID = process.env.NOTION_DATASOURCE_ID; // This is now your data source ID
 
-    console.log('Received start-timer request:', { problemName, difficulty, topic });
+    console.log('Received start-timer request:', { problemName, difficulty, topic, description: description ? 'Present' : 'Not provided' });
+    console.log('Description length:', description ? description.length : 0);
+    console.log('Description preview:', description ? description.substring(0, 200) : 'No description');
     console.log('Using data source ID:', dbID);
 
     // Validate required fields
@@ -64,6 +307,50 @@ app.post('/pages/start-timer', async function(request, response) {
                 "Source": { select: { name: "LeetCode" } }
             }
         });
+
+        // Add description as content to the page if provided
+        if (description && description.trim().length > 0) {
+            try {
+                // Parse the formatted description into Notion blocks
+                const blocks = parseDescriptionToNotionBlocks(description);
+
+                // Add a header for the description
+                const headerBlock = {
+                    object: "block",
+                    type: "heading_2",
+                    heading_2: {
+                        rich_text: [
+                            {
+                                type: "text",
+                                text: {
+                                    content: "Problem Description"
+                                }
+                            }
+                        ]
+                    }
+                };
+
+                // Combine header and description blocks
+                const allBlocks = [headerBlock, ...blocks];
+
+                // Debug: Log the blocks being sent to Notion
+                console.log('Sending blocks to Notion:');
+                allBlocks.forEach((block, index) => {
+                    console.log(`Block ${index}:`, JSON.stringify(block, null, 2));
+                });
+
+                // Append blocks to the page
+                await notion.blocks.children.append({
+                    block_id: newPage.id,
+                    children: allBlocks
+                });
+
+                console.log('Description added to Notion page');
+            } catch (descError) {
+                console.error('Error adding description to page:', descError);
+                // Don't fail the entire request if description fails
+            }
+        }
 
         response.status(200).json({
             success: true,
