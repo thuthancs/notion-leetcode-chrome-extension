@@ -20,7 +20,7 @@ const setTimer = (difficulty) => {
     let minutes = 0;
     if (difficulty === "Hard") minutes = 30;
     else if (difficulty === "Medium") minutes = 20;
-    else if (difficulty === "Easy") minutes = 10;
+    else if (difficulty === "Easy") minutes = 1;
 
     timerField.value = `${minutes}:00`;
 
@@ -91,12 +91,19 @@ function startCountdown(durationMinutes) {
 }
 
 // When the start button is clicked, the timer starts to count down
-startBtn.addEventListener("click", () => {
+startBtn.addEventListener("click", async () => {
     let minutes = setTimer(difficultyField.value);
     startCountdown(minutes);
 
     document.querySelector(".container").style.display = "none";
     document.querySelector(".timer-container").style.display = "block";
+
+    // Get stored description
+    const description = await new Promise((resolve) => {
+        chrome.storage.local.get("problemDescription", (result) => {
+            resolve(result.problemDescription || "");
+        });
+    });
 
     // Tell server to create a new Notion page
     fetch("http://localhost:3000/pages/start-timer", {
@@ -105,7 +112,8 @@ startBtn.addEventListener("click", () => {
         body: JSON.stringify({
             problemName: problemNameField.value,
             difficulty: difficultyField.value,
-            topic: topicField.value
+            topic: topicField.value,
+            description: description
         })
     }).then(res => res.json())
       .then(data => {
@@ -326,6 +334,19 @@ async function populateFields() {
             difficultyField.value = response.difficulty || "Unknown";
             topicField.value = response.topic || "Unknown";
             setTimer(response.difficulty);
+            
+            // Debug logging for description
+            console.log('Received response:', response);
+            console.log('Description received:', response.description);
+            console.log('Description length:', response.description ? response.description.length : 0);
+            
+            // Store description for later use when creating Notion page
+            if (response.description) {
+                chrome.storage.local.set({ problemDescription: response.description });
+                console.log('Description stored in Chrome storage');
+            } else {
+                console.log('No description to store');
+            }
         } else {
             problemNameField.value = "Could not scrape problem data";
             difficultyField.value = "";

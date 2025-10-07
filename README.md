@@ -26,10 +26,10 @@ A Chrome extension and backend server to seamlessly track your LeetCode problem-
    The extension is a side panel and only works on Google Chrome. Other browsers (like Arc) are not supported.
 2. **Node.js & npm**  
    Required to run the backend server.
-3. **Notion Integration**  
+3. **Notion Integration**
    - You must create a Notion integration and obtain an internal integration secret (API Key).
    - The integration must have access to your Notion data source (see below).
-4. **Notion Data Source ID**  
+4. **Notion Data Source ID**
    - You must use the **data source ID** (not the old database ID) for your Notion table.
 
 ---
@@ -51,10 +51,12 @@ A Chrome extension and backend server to seamlessly track your LeetCode problem-
 - Open your data source in Notion.
 - Copy the ID from the URL (see [Notion docs](https://developers.notion.com/docs/upgrade-guide-2025-09-03) for details).
 - **Note:** Make sure you are using the data source ID, not the database ID.
+  <img src="data_source_id.png" alt="Chrome Extension Screenshot">
 
 ### 4. Configure the `.env` File
 
 Create a `.env` file in the `server` directory with the following content:
+
 ```
 NOTION_KEY={your-api-key}
 NOTION_DATASOURCE_ID={your-datasource-id}
@@ -68,6 +70,7 @@ NOTION_DATASOURCE_ID={your-datasource-id}
 2. Enable **Developer mode** (top right).
 3. Click **Load unpacked** and select the `extension` folder.
 4. The extension icon should appear in your Chrome toolbar.
+   <img src="chrome_extension.png" alt="Chrome Extension Screenshot">
 
 ---
 
@@ -78,7 +81,7 @@ NOTION_DATASOURCE_ID={your-datasource-id}
    ```
    npm install
    ```
-2. **Start the backend server:**  
+2. **Start the backend server:**
    ```
    npm start
    ```
@@ -86,7 +89,7 @@ NOTION_DATASOURCE_ID={your-datasource-id}
    ```
    node server.js
    ```
-3. **Use the extension:**  
+3. **Use the extension:**
    - Visit a LeetCode problem page.
    - Open the extension from the side panel.
    - Start the timer, solve the problem, and click `Solved`—your data will be sent to Notion!
