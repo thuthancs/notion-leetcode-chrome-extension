@@ -29,7 +29,9 @@ A Chrome extension and backend server to seamlessly track your LeetCode problem-
 3. **Notion Integration**
    - You must create a Notion integration and obtain an internal integration secret (API Key).
    - The integration must have access to your Notion data source (see below).
-4. **Notion Data Source ID**
+4. **Create a Notion Data Source**
+   - This is the template I customized to support my LeetCode practice: [Notion LeetCode Question Bank](https://www.notion.so/thuinanutshell/24427ab8c7b880f8b8d7eadaa7274c16?v=24427ab8c7b8800a8e32000c2268292c&source=copy_link)
+6. **Notion Data Source ID**
    - You must use the **data source ID** (not the old database ID) for your Notion table.
 
 ---
